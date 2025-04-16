@@ -1,0 +1,124 @@
+# 1. Hiển thị toàn bộ danh sách khách hàng
+
+SELECT *
+FROM TAI_SAN;
+
+# 2. Lấy danh sách tên nhân viên và chức vụ của họ
+SELECT HO_TEN, CHUC_VU
+FROM NHAN_VIEN;
+
+# 3. Tìm số điện thoại và địa chỉ của khách hàng có mã KH001
+SELECT DIEN_THOAI, DIA_CHI
+FROM KHACH_HANG
+WHERE MA_KHACH_HANG = 'KH001';
+
+# 4. Đếm số lượng khách hàng có trong hệ thống
+SELECT COUNT(MA_KHACH_HANG) AS SO_LUONG_KHACH_HANG
+FROM KHACH_HANG;
+
+# 5. Liệt kê các hợp đồng có giá trị cầm cố trên 20 triệu
+SELECT *
+FROM HOP_DONG
+WHERE GIA_TRI_CAM_CO > 20000000;
+
+# 6. Tìm tất cả tài sản có loại là "Điện tử"
+SELECT *
+FROM TAI_SAN
+WHERE LOAI = 'Điện tử';
+
+# 7. Lấy danh sách hóa đơn được xuất sau ngày 01/03/2024
+SELECT *
+FROM HOA_DON
+WHERE NGAY_XUAT > '2024-03-01';
+
+# 8. Tìm danh sách nhân viên có lương từ 10 triệu trở lên
+SELECT *
+FROM NHAN_VIEN
+WHERE LUONG >= 10000000;
+
+# 9. Thống kê số lượng tài sản theo từng loại
+SELECT LOAI, COUNT(MA_TAI_SAN) AS SO_LUONG
+FROM TAI_SAN
+GROUP BY LOAI;
+
+# 10. Tìm các khách hàng ở quận tân bình
+SELECT *
+FROM KHACH_HANG
+WHERE DIA_CHI LIKE '%Tân Bình%';
+
+# 11. Tính tổng số tiền khách hàng đã trả trong bảng hóa đơn
+SELECT SUM(SO_TIEN_TRA) AS TONG_SO_TIEN_TRA
+FROM HOA_DON;
+
+# 12. Tìm hợp đồng có ngày chuộc gần nhất
+SELECT *
+FROM HOP_DONG
+WHERE NGAY_CHUOC = (SELECT MAX(NGAY_CHUOC) FROM HOP_DONG);
+
+# 13. Liệt kê danh sách khách hàng cùng số hợp đồng họ đã ký
+SELECT KH.MA_KHACH_HANG, KH.HO_TEN, COUNT(HD.MA_HOP_DONG) AS SO_HOP_DONG
+FROM KHACH_HANG KH
+         LEFT JOIN HOP_DONG HD USING (MA_KHACH_HANG)
+GROUP BY KH.MA_KHACH_HANG, KH.HO_TEN
+ORDER BY SO_HOP_DONG DESC;
+
+# 14. Tìm khách hàng có tổng giá trị cầm cố cao nhất
+SELECT KH.MA_KHACH_HANG, KH.HO_TEN, SUM(HD.GIA_TRI_CAM_CO) AS TONG_GIA_TRI_CAM_CO
+FROM KHACH_HANG KH
+         JOIN HOP_DONG HD USING (MA_KHACH_HANG)
+GROUP BY KH.MA_KHACH_HANG, KH.HO_TEN
+ORDER BY TONG_GIA_TRI_CAM_CO DESC
+LIMIT 1;
+
+# 15. Tìm nhân viên có số hợp đồng thực hiện nhiều nhất
+SELECT NV.MA_NHAN_VIEN, NV.HO_TEN, COUNT(HD.MA_HOP_DONG) AS SO_HOP_DONG
+FROM NHAN_VIEN NV
+         JOIN HOP_DONG HD USING (MA_NHAN_VIEN)
+GROUP BY NV.MA_NHAN_VIEN, NV.HO_TEN
+ORDER BY SO_HOP_DONG DESC
+LIMIT 1;
+
+# 16. Tăng lương cho nhân viên quản lý 2 hợp đồng trở lên 30%
+
+UPDATE NHAN_VIEN
+SET LUONG = LUONG * 1.3
+WHERE MA_NHAN_VIEN IN (SELECT MA_NHAN_VIEN FROM HOP_DONG GROUP BY MA_NHAN_VIEN HAVING COUNT(MA_HOP_DONG) >= 2);
+
+# 17. Xóa những nhân viên lương dưới 20000000
+
+DELETE
+FROM TAI_SAN
+WHERE MA_HOP_DONG IN (SELECT MA_HOP_DONG FROM HOP_DONG WHERE MA_NHAN_VIEN IN (SELECT MA_NHAN_VIEN FROM NHAN_VIEN WHERE NHAN_VIEN.LUONG < 20000000));
+
+ALTER TABLE HOA_DON DROP FOREIGN KEY HOA_DON_ibfk_3;
+
+ALTER TABLE HOA_DON ADD CONSTRAINT HOA_DON_ibfk_3 FOREIGN KEY(MA_HOP_DONG)
+REFERENCES HOP_DONG(MA_HOP_DONG) ON DELETE CASCADE;
+
+
+-- Delete related child records from TAI_SAN first
+DELETE FROM TAI_SAN
+WHERE MA_HOP_DONG IN (
+    SELECT MA_HOP_DONG FROM (
+        SELECT MA_HOP_DONG FROM HOP_DONG
+        WHERE MA_NHAN_VIEN IN (
+            SELECT MA_NHAN_VIEN FROM NHAN_VIEN WHERE LUONG < 200000000
+        )
+    ) AS temp_hop_dong
+);
+
+-- Now delete parent HOP_DONG records
+DELETE FROM HOP_DONG
+WHERE MA_NHAN_VIEN IN (
+    SELECT MA_NHAN_VIEN FROM (
+        SELECT MA_NHAN_VIEN FROM NHAN_VIEN WHERE LUONG < 200000000
+    ) AS temp_nhan_vien
+);
+
+DELETE
+FROM HOA_DON
+WHERE MA_NHAN_VIEN IN (SELECT MA_NHAN_VIEN FROM NHAN_VIEN WHERE NHAN_VIEN.LUONG < 200000000);
+
+DELETE
+FROM NHAN_VIEN
+WHERE LUONG < 200000000
